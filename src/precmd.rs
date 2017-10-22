@@ -1,5 +1,6 @@
 use std::env;
-use ansi_term::Colour::{Cyan, Blue, Red};
+use std::process::Command;
+use ansi_term::Colour::{Cyan, Blue, Red, Green};
 use ansi_term::ANSIStrings;
 use git2::{self, Repository, StatusOptions};
 use regex::Regex;
@@ -23,7 +24,7 @@ fn repo_status(r: &Repository) -> Option<String> {
     Err(_) => return None
   };
 
-  let shorthand = Cyan.paint(head.shorthand().unwrap().to_string());
+  let shorthand = Blue.bold().paint(head.shorthand().unwrap().to_string());
   let statuses = match r.statuses(Some(&mut opts)) {
     Ok(statuses) => statuses,
     Err(_) => return None
@@ -50,26 +51,39 @@ fn repo_status(r: &Repository) -> Option<String> {
 
     if is_dirty { break }
   }
-  let mut out = vec![shorthand];
+
+  let mut out = vec![Green.bold().paint("["), shorthand];
   if is_dirty {
     out.push(Red.bold().paint("*"));
   }
+  out.push(Green.bold().paint("]"));
 
   Some(ANSIStrings(&out).to_string())
 }
 
 pub fn display(_sub: &ArgMatches) {
+  let user = match env::var("USER") {
+    Ok(val) => val,
+    Err(_) => "none".to_string()
+  };
+  let user = Green.bold().paint(user);
+
+  let host = match Command::new("hostname").output() {
+    Ok(val) => String::from_utf8_lossy(&val.stdout).trim().to_string(),
+    Err(_) => "none".to_string()
+  };
+  let host = Cyan.bold().paint(host);
+  let at = Blue.bold().paint("@");
   let my_path = env::current_dir().unwrap();
-  let display_path = Blue.paint(shorten_path(my_path.to_str().unwrap()));
+  let display_path = Green.paint(shorten_path(my_path.to_str().unwrap()));
 
   let branch = match Repository::discover(my_path) {
     Ok(repo) => repo_status(&repo),
     Err(_e) => None,
   };
-  let display_branch = Cyan.paint(branch.unwrap_or_default());
+  let display_branch = branch.unwrap_or_default();
 
-  println!("");
-  println!("{} {}", display_path, display_branch);
+  println!("{}{}{} {} {}", user, at, host, display_path, display_branch);
 }
 
 pub fn cli_arguments<'a>() -> App<'a, 'a> {
